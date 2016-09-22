@@ -79,9 +79,13 @@ int threadpool_create(threadpool **retval, int threadcount) {
   for (int i = 0; i < threadcount; i++) {
     struct _worker *w = &(pool->workers[i]);
     if(pthread_create(&(w->thread), NULL, _worker_func, (void *) w)) {
-      /* TODO This is a delicate one and I don't feel like writing the
-       * error handler right now. Deal with this later. It can go through
-       * destroy as long as the locking situation is properly dealt with */
+      /* Gotta be initialized to be able to destroy */
+      while (pool->initializing) {
+        pthread_cond_wait(&(pool->cv), &(pool->lock));
+      }
+      /* destroy is gonna lock it again */
+      pthread_mutex_unlock(&(pool->lock));
+      threadpool_destroy(pool);
       return 0;
     }
     w->parent = pool;
