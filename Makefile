@@ -1,5 +1,5 @@
 CC=gcc
-CLFAGS=-Wall -fPIC -Iinclude
+CFLAGS=-Wall -fPIC -I./include -std=c99
 LDFLAGS=-lm
 SOURCES=$(wildcard src/*.c)
 OBJECTS=$(patsubst %.c,%.o,$(SOURCES))
