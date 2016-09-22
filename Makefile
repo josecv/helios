@@ -13,4 +13,4 @@ helios: $(OBJECTS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -rf *.o helios
+	rm -rf src/*.o helios
