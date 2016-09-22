@@ -7,7 +7,7 @@ Style
 
 ```
 void my_func(int a, int b) {
-  if(condition) {
+  if (condition) {
     /* Blah */
   } else {
     /* Blah */

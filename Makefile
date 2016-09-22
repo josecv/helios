@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -fPIC -I./include -std=c99
-LDFLAGS=-lm
+CFLAGS=-Wall -fPIC -I./include -std=c99 -pthread -g
+LDFLAGS=-lm -pthread
 SOURCES=$(wildcard src/*.c)
 OBJECTS=$(patsubst %.c,%.o,$(SOURCES))
 
