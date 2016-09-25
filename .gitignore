@@ -12,6 +12,8 @@ config.h
 m4
 aclocal.m4
 autom4te.cache
+.libs
+.deps
 
 # Object files
 *.o
