@@ -4,6 +4,15 @@
 # The binary
 helios
 
+# Autotools stuff
+Makefile
+config.log
+config.status
+config.h
+m4
+aclocal.m4
+autom4te.cache
+
 # Object files
 *.o
 *.ko
