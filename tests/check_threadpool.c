@@ -15,18 +15,40 @@
  * along with helios.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <check.h>
+#include <stdlib.h>
+#include "threadpool.h"
 
-START_TEST(test_threadpool_noretval) {
+/* How many elements to map over */
+#define NUM_ELEMENTS 100
 
+void *mapper(void *arg) {
+  int *a = (int *) arg;
+  *a *= 100;
+  return NULL;
+}
+
+START_TEST(test_threadpool_noretval_basic) {
+  threadpool *tp;
+  int args[NUM_ELEMENTS];
+  for (int i = 0; i < NUM_ELEMENTS; i++) {
+    args[i] = i;
+  }
+  threadpool_create(&tp, 2);
+  threadpool_submit(tp, NULL, mapper, (unsigned char *)args, sizeof(int),
+                    NUM_ELEMENTS);
+  for (int i = 0; i < NUM_ELEMENTS; i++) {
+    ck_assert_int_eq(args[i], i * 100);
+  }
+  threadpool_destroy(tp);
 }
 END_TEST
 
 Suite *threadpool_suite(void) {
   Suite *s;
-  TCase *tc_core;
+  TCase *tc_noretval;
   s = suite_create("threadpool");
-  tc_core = tcase_create("Core");
-  tcase_add_test(tc_core, test_threadpool_noretval);
-  suite_add_tcase(s, tc_core);
+  tc_noretval = tcase_create("NoRetval");
+  tcase_add_test(tc_noretval, test_threadpool_noretval_basic);
+  suite_add_tcase(s, tc_noretval);
   return s;
 }
