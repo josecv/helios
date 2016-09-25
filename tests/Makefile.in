@@ -506,9 +506,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CFLAGS = -I $(srcdir)/../include -Wall -std=c99
 check_helios_SOURCES = check_helios.c
-check_helios_CFLAGS = $(CHECK_CFLAGS)
+check_helios_CFLAGS = $(CHECK_CFLAGS) -I $(srcdir)/../include
 check_helios_LDADD = $(top_builddir)/src/libhelios.la $(CHECK_LIBS)
 all: all-am
 
