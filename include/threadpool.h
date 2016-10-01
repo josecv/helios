@@ -44,6 +44,9 @@ int threadpool_destroy(threadpool *pool);
 
 /**
  * Submit a set of jobs to this thread pool and block until they are done.
+ * May optionally accept a retvals parameter; this will be offset and
+ * passed to the worker in the expectation that it knows what it is and will
+ * populate it accordingly.
  *
  * @param pool the pool
  * @param retvals the return values of the jobs, or NULL if you don't care
@@ -51,10 +54,12 @@ int threadpool_destroy(threadpool *pool);
  * @param arguments the arguments over which to run the function
  * @param arg_size the size of each argument
  * @param arg_count the number of arguments
+ * @param retval_size the size of the return value (this should be known by
+ *        the mapper!)
  * @return 1 if successful.
  */
-int threadpool_submit(threadpool *pool, void **retvals,
-    void * (*mapper)(void *), unsigned char *arguments, size_t arg_size,
-    int arg_count);
+int threadpool_submit(threadpool *pool, unsigned char *retvals,
+    void (*mapper)(void *, void *), unsigned char *arguments, size_t arg_size,
+    int arg_count, size_t retval_size);
 
 #endif /* __HELIOS_THREAD_POOL__ */

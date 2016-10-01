@@ -28,13 +28,13 @@ enum _status {
 
 struct _worker {
   enum _status status; /* The status */
-  void * (*func) (void *); /* The job function */
+  void (*func) (void *, void *); /* The job function */
   void *arg; /* The job's argument */
-  void *retval; /* The job's return value, or null */
-  int has_data; /* Whether there's data to return */
+  void *retval; /* The job's return value */
   threadpool *parent; /* The threadpool that created this */
   pthread_t thread; /* The posix thread for this worker */
   int job_index; /* The index of the running job */
+  int done; /* Whether this job has just finished and hasn't been harvested */
 };
 
 struct _threadpool {
@@ -131,9 +131,9 @@ int threadpool_destroy(threadpool *pool) {
   return 1;
 }
 
-int threadpool_submit(threadpool *pool, void **retvals,
-    void * (*mapper)(void *), unsigned char *arguments, size_t arg_size,
-    int arg_count) {
+int threadpool_submit(threadpool *pool, unsigned char *retvals,
+    void (*mapper)(void *, void *), unsigned char *arguments, size_t arg_size,
+    int arg_count, size_t retval_size) {
   int submitted = 0;
   int done = 0;
   int t = 0;
@@ -146,17 +146,19 @@ int threadpool_submit(threadpool *pool, void **retvals,
     for (t = 0; t < pool->count; t++) {
       struct _worker *w = &(pool->workers[t]);
       if (w->status == RUNNABLE) {
-        if (w->has_data) {
-          if (retvals) {
-            retvals[w->job_index] = w->retval;
-          }
-          w->has_data = 0;
+        if (w->done) {
           done++;
+          w->done = 0;
         }
         if (submitted < arg_count) {
           signal = 1;
           w->job_index = submitted;
           w->func = mapper;
+          if (retvals) {
+            w->retval = (void *) (retvals + (submitted * retval_size));
+          } else {
+            w->retval = NULL;
+          }
           w->arg = (void *) (arguments + (submitted * arg_size));
           w->status = RUNNING;
           submitted++;
@@ -191,10 +193,10 @@ static void *_worker_func(void *the_worker) {
     }
     if (worker->status == RUNNING) {
       pthread_mutex_unlock(lock);
-      worker->retval = worker->func(worker->arg);
+      worker->func(worker->arg, worker->retval);
       pthread_mutex_lock(lock);
-      worker->has_data = 1;
       worker->status = RUNNABLE;
+      worker->done = 1;
     }
     pthread_cond_broadcast(cv);
   }
