@@ -133,7 +133,7 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)" "$(DESTDIR)$(bindir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libhelios_la_LIBADD =
-am_libhelios_la_OBJECTS = threadpool.lo
+am_libhelios_la_OBJECTS = threadpool.lo neuralnet.lo
 libhelios_la_OBJECTS = $(am_libhelios_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -332,7 +332,9 @@ top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = -I $(srcdir)/../include -Wall -std=c99
 lib_LTLIBRARIES = libhelios.la
-libhelios_la_SOURCES = threadpool.c $(top_builddir)/include/threadpool.h
+libhelios_la_SOURCES = threadpool.c $(top_builddir)/include/threadpool.h \
+											 neuralnet.c $(top_builddir)/include/neuralnet.h
+
 helios_SOURCES = helios.c
 helios_LDADD = libhelios.la
 all: all-am
@@ -467,6 +469,7 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/helios.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/neuralnet.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/threadpool.Plo@am__quote@
 
 .c.o:
