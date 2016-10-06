@@ -32,7 +32,9 @@ typedef struct _netconfig {
   const int *layer_sizes; /* The sizes of each layer in the network */
   int dimensionality; /* The dimensionality of the input */
   activation_func activation; /* The activation function */
-  activation_func activation_prime; /* Derivative of the activation function */
+  activation_func activation_prime; /* Derivative of the activation function
+                                     * AS A FUNCTION OF THE ACTIVATION FUNCTION
+                                     * (eg x(1 - x) for a sigmoid) */
   activation_range range; /* The range for the activation function */
   int threads; /* How many threads to give to this net */
   double alpha; /* The learning rate for the network */
@@ -76,11 +78,11 @@ int train(neuralnet *net, const double **inputs, const int *labels,
  * Classify the inputs given.
  * @param net the net
  * @param input the inputs
- * @param classes the classes the network came up with
+ * @param results the network's results
  * @param input_count the number of inputs
  * @return did it succeed?
  */
-int classify(neuralnet *net, const double **inputs, int *classes,
+int classify(neuralnet *net, const double **inputs, double *results,
              int input_count);
 
 #endif /* __HELIOS_NEURALNET__ */
