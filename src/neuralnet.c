@@ -330,7 +330,7 @@ static void _bp_worker(void *in, void *out) {
     for (int input = 0; input < params->w_count; input++) {
       GET_WEIGHT(params->oldw_w, mw, 0, neuron, input) =
         GET_WEIGHT(params->weights, mw, 0, neuron, input);
-      GET_WEIGHT(params->weights, mw, 0, neuron, input) =
+      GET_WEIGHT(params->weights, mw, 0, neuron, input) +=
         params->config->alpha * params->derr_w[neuron] * params->inputs[input];
     }
   }
