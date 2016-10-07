@@ -203,6 +203,9 @@ int neuralnet_destroy(neuralnet *net) {
 static int _init_layer_params(neuralnet *net) {
   net->l_params = malloc(sizeof(layer_params) * net->config.threads *
                          net->config.layers);
+  if (!net->l_params) {
+    return 0;
+  }
   int mw = net->config.max_width;
   for (int layer = 0; layer < net->config.layers; layer++) {
     for (int t = 0; t < net->config.threads; t++) {
