@@ -206,6 +206,8 @@ static int _init_layer_params(neuralnet *net) {
   int mw = net->config.max_width;
   for (int layer = 0; layer < net->config.layers; layer++) {
     for (int t = 0; t < net->config.threads; t++) {
+      /* the if()s inside a loop will probably be fine here, hopefully this init
+       * code isn't run too often. */
       layer_params *p = &(net->l_params[layer * net->config.threads + t]);
       p->config = &(net->config);
       p->weights = &(GET_WEIGHT(net->w, mw, layer, 0, 0));
@@ -213,25 +215,22 @@ static int _init_layer_params(neuralnet *net) {
        * weigths every layer */
       p->oldw_r = &(GET_WEIGHT(net->oldw, mw, layer % 2, 0, 0));
       p->oldw_w = &(GET_WEIGHT(net->oldw, mw, 1 - (layer % 2), 0, 0));
-      p->w_count = net->config.layer_sizes[layer];
+      if (!layer ) {
+        p->w_count = net->config.dimensionality;
+      } else {
+        p->w_count = net->config.layer_sizes[layer - 1];
+        /* Layers other than the first layer need to have their inputs hooked
+         * up to the outputs of the last layer. */
+        p->inputs = &(net->out[(layer - 1) * mw]);
+      }
+      /* Output layer doesn't really use this but it doesn't matter if we set
+       * it */
+      p->wnext_count = net->config.layer_sizes[layer];
       p->outputs = &(net->out[layer * mw]);
       p->derr_r = &(net->derr[(layer % 2) * mw]);
       p->derr_w = &(net->derr[(1 - (layer % 2)) * mw]);
       /* TODO: Check the literature on this factor. I'm not sure what's best */
       p->ifactor = net->config.iscale * (net->config.layer_sizes[layer] / mw);
-      /* an if() inside a loop will probably be fine here, hopefully this init
-       * code isn't run too often.
-       * Layers other than the input layer need to have their inputs hooked
-       * up to the outputs of the last layer. */
-      if (layer) {
-        p->inputs = &(net->out[(layer - 1) * mw]);
-      }
-      /* Layers other than the final layer need to know how wide the
-       * next layer is */
-      if (layer < net->config.layers - 1) {
-        p->wnext_count = net->config.layer_sizes[layer + 1];
-      }
-      /* TODO Different input factor for last layer? Again check */
       if (layer == net->config.layers - 1) {
         p->ifactor = net->config.iscale;
       }
