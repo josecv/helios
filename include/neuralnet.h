@@ -71,7 +71,7 @@ int neuralnet_destroy(neuralnet *net);
  * @param input_count the number of inputs
  * @return did it succeed?
  */
-int train(neuralnet *net, const double **inputs, const int *labels,
+int train(neuralnet *net, const double **inputs, const double **labels,
           int input_count);
 
 /**

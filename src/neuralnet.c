@@ -31,16 +31,20 @@
   warray[max_width * max_width * layer + max_width * neuron + weight]
 
 /**
- * Do a feed forward pass on the network
+ * Initialize the parameters for each layer for each worker.
  */
-static void _feed_forward(neuralnet *net, const double **inputs,
-                          int input_count);
+static int _init_layer_params(neuralnet *net);
 
 /**
- * Do a backpropagate on the network, adjusting stuff as we go.
+ * Do one single feed forward pass on the network
  */
-static void _back_propagate(neuralnet *net, const double **inputs,
-                            const int *labels, int input_count);
+static void _feed_forward(neuralnet *net, const double *inputs);
+
+/**
+ * Do one single backpropagate on the network, adjusting stuff as we go.
+ */
+static void _back_propagate(neuralnet *net, const double *inputs,
+                            const double *labels);
 
 /**
  * The worker for the feedforward pass.
@@ -58,19 +62,10 @@ static void _output_bp_worker(void *in, void *out);
  */
 static void _bp_worker(void *in, void *out);
 
-struct _neuralnet {
-  netconfig config; /* The net's configuration */
-  threadpool *pool; /* Our threadpool */
-  double *w; /* All the weights. See below for indexing */
-  double *oldw; /* The old unadjusted weights (for backpropagation) */
-  double *derr; /* All the error derivatives. */
-  double *out; /* All the neuron outputs. */
-};
-
 /**
  * A structure containing parameters for each worker for each layer.
  */
-struct _layer_params {
+typedef struct _layer_params {
   const netconfig *config; /* The network configuration */
   int start; /* The first neuron to look at, inclusive */
   int end; /* The last neuron to look at, exclusive */
@@ -80,13 +75,25 @@ struct _layer_params {
   int w_count; /* How many weights are there in this layer, per neuron */
   int wnext_count; /* How many weights in the next layer connect to each neuron
                     * in this one. */
-  double *inputs; /* The inputs to this layer */
+  const double *inputs; /* The inputs to this layer */
   double *derr_r; /* The derivative of the error at the next layer */
   double *derr_w; /* The derivative of the error at this layer */
   double *outputs; /* The outputs for this layer */
-  int *targets; /* The targets - only if this corresponds to the last layer */
+  const double *targets; /* The targets - only if this corresponds to the
+                          * last layer */
   double ifactor; /* The input factor for this layer */
+} layer_params;
+
+struct _neuralnet {
+  netconfig config; /* The net's configuration */
+  threadpool *pool; /* Our threadpool */
+  double *w; /* All the weights. See below for indexing */
+  double *oldw; /* The old unadjusted weights (for backpropagation) */
+  double *derr; /* The error derivatives. */
+  double *out; /* All the neuron outputs. */
+  layer_params *l_params; /* Array of parameters for layer workers */
 };
+
 
 int neuralnet_create(neuralnet **retval, netconfig config) {
   neuralnet *net = malloc(sizeof(struct _neuralnet));
@@ -109,8 +116,14 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     free(net);
     return 0;
   }
+  /* That 2 is to save a bit of memory; after all we only ever need
+   * two sets of old error derivatives: the ones for the next layer, to adjust
+   * this layer, and an empty array for the ones for this layer so that
+   * we can save them as we adjust the layer.
+   * See the backpropagation method for how this works in practice.
+   */
   net->derr = malloc(sizeof(double) * net->config.max_width *
-                     net->config.layers);
+                     2);
   if (!net->derr) {
     perror("neuralnet_create");
     threadpool_destroy(net->pool);
@@ -128,12 +141,8 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     free(net);
     return 0;
   }
-  /* That 2 is to save a bit of memory; after all we only ever need
-   * two sets of old weights: the ones for the next layer, to adjust
-   * this layer, and an empty array for the ones for this layer so that
-   * we can save them as we adjust the layer.
-   * See the backpropagation method for how this works in practice.
-   * This also prevents an expensive memcpy before every layer's adjustment.
+  /* See the above comment about the derr for why we only allocate 2.
+   * In this case this also saves us an expensive memcpy before every layer
    */
   net->oldw = malloc(sizeof(double) * net->config.max_width *
                      net->config.max_width * 2);
@@ -145,21 +154,35 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     free(net->w);
     free(net);
   }
+  if(!_init_layer_params(net)) {
+    perror("neuralnet_create");
+    threadpool_destroy(net->pool);
+    free(net->out);
+    free(net->derr);
+    free(net->w);
+    free(net->oldw);
+    free(net);
+    return 0;
+  }
   *retval = net;
   return 1;
 }
 
-int train(neuralnet *net, const double **inputs, const int *labels,
+int train(neuralnet *net, const double **inputs, const double **labels,
           int input_count) {
-  _feed_forward(net, inputs, input_count);
-  _back_propagate(net, inputs, labels, input_count);
+  for (int i = 0; i < input_count; i++) {
+    _feed_forward(net, inputs[i]);
+    _back_propagate(net, inputs[i], labels[i]);
+  }
   return 1;
 }
 
 int classify(neuralnet *net, const double **inputs, double *results,
              int input_count) {
-  _feed_forward(net, inputs, input_count);
-  /* TODO Cook up how the results come out of here */
+  for (int i = 0; i < input_count; i++) {
+    _feed_forward(net, inputs[i]);
+    /* TODO Cook up how the results come out of here */
+  }
   return 1;
 }
 
@@ -177,18 +200,79 @@ int neuralnet_destroy(neuralnet *net) {
   return rc;
 }
 
-static void _feed_forward(neuralnet *net, const double **inputs,
-                          int input_count) {
-
+static int _init_layer_params(neuralnet *net) {
+  net->l_params = malloc(sizeof(layer_params) * net->config.threads *
+                         net->config.layers);
+  int mw = net->config.max_width;
+  for (int layer = 0; layer < net->config.layers; layer++) {
+    for (int t = 0; t < net->config.threads; t++) {
+      layer_params *p = &(net->l_params[layer * net->config.threads + t]);
+      p->config = &(net->config);
+      p->weights = &(GET_WEIGHT(net->w, mw, layer, 0, 0));
+      /* layer % 2 will ensure that we alternate between read and write old
+       * weigths every layer */
+      p->oldw_r = &(GET_WEIGHT(net->oldw, mw, layer % 2, 0, 0));
+      p->oldw_w = &(GET_WEIGHT(net->oldw, mw, 1 - (layer % 2), 0, 0));
+      p->w_count = net->config.layer_sizes[layer];
+      p->outputs = &(net->out[layer * mw]);
+      p->derr_r = &(net->derr[(layer % 2) * mw]);
+      p->derr_w = &(net->derr[(1 - (layer % 2)) * mw]);
+      /* TODO: Check the literature on this factor. I'm not sure what's best */
+      p->ifactor = net->config.iscale * (net->config.layer_sizes[layer] / mw);
+      /* an if() inside a loop will probably be fine here, hopefully this init
+       * code isn't run too often.
+       * Layers other than the input layer need to have their inputs hooked
+       * up to the outputs of the last layer. */
+      if (layer) {
+        p->inputs = &(net->out[(layer - 1) * mw]);
+      }
+      /* Layers other than the final layer need to know how wide the
+       * next layer is */
+      if (layer < net->config.layers - 1) {
+        p->wnext_count = net->config.layer_sizes[layer + 1];
+      }
+      /* TODO Different input factor for last layer? Again check */
+      if (layer == net->config.layers - 1) {
+        p->ifactor = net->config.iscale;
+      }
+    }
+  }
+  return 1;
 }
 
-static void _back_propagate(neuralnet *net, const double **inputs,
-                            const int *labels, int input_count) {
+static void _feed_forward(neuralnet *net, const double *inputs) {
+  /* First layer has to be updated with the inputs */
+  for (int t = 0; t < net->config.threads; t++) {
+    net->l_params[t].inputs = inputs;
+  }
+  /* Now actually run stuff. */
+  for (int layer = 0; layer < net->config.layers; layer++) {
+    layer_params *params = (net->l_params + (layer * net->config.threads));
+    threadpool_submit(net->pool, NULL, _ff_worker, (unsigned char *) params,
+        sizeof(layer_params), net->config.threads, 0);
+  }
+}
 
+static void _back_propagate(neuralnet *net, const double *inputs,
+                            const double *labels) {
+  layer_params *cur_layer = net->l_params +
+    ((net->config.layers - 1) * net->config.threads);
+  /* Gotta set the target for the output layer */
+  for (int t = 0; t < net->config.threads; t++) {
+    cur_layer[t].targets = labels;
+  }
+  threadpool_submit(net->pool, NULL, _output_bp_worker,
+      (unsigned char *) cur_layer, sizeof(layer_params), net->config.threads,
+      0);
+  for (int layer = net->config.layers - 2; layer >= 0; layer--) {
+    cur_layer -= net->config.threads;
+    threadpool_submit(net->pool, NULL, _bp_worker, (unsigned char *) cur_layer,
+        sizeof(layer_params), net->config.threads, 0);
+  }
 }
 
 static void _ff_worker(void *in, void *out) {
-  struct _layer_params *params = (struct _layer_params *) in;
+  layer_params *params = (layer_params *) in;
   for (int neuron = params->start; neuron < params->end; neuron++) {
     params->outputs[neuron] = 0;
     for (int input = 0; input < params->w_count; input++) {
@@ -203,7 +287,7 @@ static void _ff_worker(void *in, void *out) {
 }
 
 static void _output_bp_worker(void *in, void *out) {
-  struct _layer_params *params = (struct _layer_params *) in;
+  layer_params *params = (layer_params *) in;
   int mw = params->config->max_width;
   for (int neuron = params->start; neuron < params->end; neuron++) {
     double out = params->outputs[neuron];
@@ -221,7 +305,7 @@ static void _output_bp_worker(void *in, void *out) {
 }
 
 static void _bp_worker(void *in, void *out) {
-  struct _layer_params *params = (struct _layer_params *) in;
+  layer_params *params = (layer_params *) in;
   int mw = params->config->max_width;
   /* This has to be three separate loops to prevent the mortal sin of
    * iterating column-wise over an array. */
