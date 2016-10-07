@@ -196,6 +196,7 @@ int neuralnet_destroy(neuralnet *net) {
   free(net->derr);
   free(net->w);
   free(net->oldw);
+  free(net->l_params);
   free(net);
   return rc;
 }
