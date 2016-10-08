@@ -209,10 +209,14 @@ static int _init_layer_params(neuralnet *net) {
   }
   int mw = net->config.max_width;
   for (int layer = 0; layer < net->config.layers; layer++) {
+    int sect_size = net->config.layer_sizes[layer] / net->config.threads;
+    layer_params *p = NULL;
     for (int t = 0; t < net->config.threads; t++) {
       /* the if()s inside a loop will probably be fine here, hopefully this init
        * code isn't run too often. */
-      layer_params *p = &(net->l_params[layer * net->config.threads + t]);
+      p = &(net->l_params[layer * net->config.threads + t]);
+      p->start = sect_size * t;
+      p->end = sect_size * (t + 1);
       p->config = &(net->config);
       p->weights = &(GET_WEIGHT(net->w, mw, layer, 0, 0));
       /* layer % 2 will ensure that we alternate between read and write old
@@ -239,6 +243,10 @@ static int _init_layer_params(neuralnet *net) {
         p->ifactor = net->config.iscale;
       }
     }
+    /* The last one has to go all the way to the end. Note that if for
+     * some reason we have 0 threads we'll segfault here. That's the user's
+     * fault for wanting us to run with no threads. */
+    p->end = net->config.layer_sizes[layer];
   }
   return 1;
 }
