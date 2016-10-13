@@ -14,21 +14,23 @@
  * You should have received a copy of the GNU General Public License
  * along with helios.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-/* We're a little lazy, so we're just gonna straight up include our different
- * test suites. This isn't a problem - they're single purpose stuff */
 #include <check.h>
 #include <stdlib.h>
-#include "check_threadpool.c"
-#include "check_neuralnet.c"
+#include "neuralnet.h"
 
-int main(int argc, char **argv) {
-  int number_failed;
-  SRunner *sr;
-  sr = srunner_create(threadpool_suite());
-  srunner_add_suite(sr, neuralnet_suite());
-  srunner_run_all(sr, CK_NORMAL);
-  number_failed = srunner_ntests_failed(sr);
-  srunner_free(sr);
-  return number_failed ? EXIT_FAILURE : EXIT_SUCCESS;
+START_TEST(test_neuralnet_xor) {
+  ck_assert_int_eq(2, 2);
+}
+END_TEST
+
+Suite *neuralnet_suite(void) {
+  Suite *s;
+  s = suite_create("neuralnet");
+
+  TCase *tc_xor = tcase_create("xor");
+  tcase_add_test(tc_xor, test_neuralnet_xor);
+
+  suite_add_tcase(s, tc_xor);
+
+  return s;
 }
