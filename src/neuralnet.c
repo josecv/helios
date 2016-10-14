@@ -18,6 +18,7 @@
 #include "neuralnet.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 /**
  * Get the weight by indexing into the weight table given.
@@ -116,6 +117,9 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     free(net);
     return 0;
   }
+  for (int i = 0; i < sz; i++) {
+    net->w[i] = 0.5;
+  }
   /* That 2 is to save a bit of memory; after all we only ever need
    * two sets of old error derivatives: the ones for the next layer, to adjust
    * this layer, and an empty array for the ones for this layer so that
@@ -168,20 +172,27 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
   return 1;
 }
 
-int train(neuralnet *net, const double **inputs, const double **labels,
-          int input_count) {
+int neuralnet_train(neuralnet *net, const double *inputs, const double *labels,
+                    int input_count) {
+  int out_dim = net->config.layer_sizes[net->config.layers - 1];
+  int dim = net->config.dimensionality;
   for (int i = 0; i < input_count; i++) {
-    _feed_forward(net, inputs[i]);
-    _back_propagate(net, inputs[i], labels[i]);
+    _feed_forward(net, &(inputs[i * dim]));
+    _back_propagate(net, &(inputs[i * dim]), &(labels[i * out_dim]));
   }
   return 1;
 }
 
-int classify(neuralnet *net, const double **inputs, double *results,
-             int input_count) {
+int neuralnet_classify(neuralnet *net, const double *inputs, double *results,
+                       int input_count) {
+  int last_layer = net->config.layers - 1;
+  int out_dimensionality = net->config.layer_sizes[last_layer];
+  int mw = net->config.max_width;
   for (int i = 0; i < input_count; i++) {
-    _feed_forward(net, inputs[i]);
-    /* TODO Cook up how the results come out of here */
+    const double *input = &(inputs[i * net->config.dimensionality]);
+    _feed_forward(net, input);
+    memcpy(&(results[i * out_dimensionality]), &(net->out[mw * last_layer]),
+           sizeof(double) * out_dimensionality);
   }
   return 1;
 }

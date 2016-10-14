@@ -17,12 +17,10 @@
 #ifndef __HELIOS_NEURALNET__
 #define __HELIOS_NEURALNET__
 
+/**
+ * An activation function.
+ */
 typedef double (*activation_func)(double);
-
-typedef enum {
-  ZERO_TO_ONE = 0,
-  NEGATIVE_ONE_TO_ONE,
-} activation_range;
 
 /**
  * An intial configuration for a neural net.
@@ -35,7 +33,6 @@ typedef struct _netconfig {
   activation_func activation_prime; /* Derivative of the activation function
                                      * AS A FUNCTION OF THE ACTIVATION FUNCTION
                                      * (eg x(1 - x) for a sigmoid) */
-  activation_range range; /* The range for the activation function */
   int threads; /* How many threads to give to this net */
   double alpha; /* The learning rate for the network */
   double iscale; /* The input scale */
@@ -71,8 +68,8 @@ int neuralnet_destroy(neuralnet *net);
  * @param input_count the number of inputs
  * @return did it succeed?
  */
-int train(neuralnet *net, const double **inputs, const double **labels,
-          int input_count);
+int neuralnet_train(neuralnet *net, const double *inputs, const double *labels,
+                    int input_count);
 
 /**
  * Classify the inputs given.
@@ -82,7 +79,7 @@ int train(neuralnet *net, const double **inputs, const double **labels,
  * @param input_count the number of inputs
  * @return did it succeed?
  */
-int classify(neuralnet *net, const double **inputs, double *results,
-             int input_count);
+int neuralnet_classify(neuralnet *net, const double *inputs, double *results,
+                       int input_count);
 
 #endif /* __HELIOS_NEURALNET__ */
