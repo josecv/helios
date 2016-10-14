@@ -108,6 +108,7 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     free(net);
     return 0;
   }
+  net->config.max_width++;
   size_t sz = net->config.max_width * net->config.max_width *
               net->config.layers;
   net->w = malloc(sizeof(double) * sz);
@@ -297,12 +298,17 @@ static void _ff_worker(void *in, void *out) {
   layer_params *params = (layer_params *) in;
   for (int neuron = params->start; neuron < params->end; neuron++) {
     params->outputs[neuron] = 0;
-    for (int input = 0; input < params->w_count; input++) {
+    int input;
+    for (input = 0; input < params->w_count; input++) {
       /* It's the zeroth layer because params->weight already points at the
        * weigths for this layer (not for the entire network) */
       params->outputs[neuron] += GET_WEIGHT(params->weights,
           params->config->max_width, 0, neuron, input) * params->inputs[input];
     }
+    /* Now add in the bias */
+    params->outputs[neuron] += GET_WEIGHT(params->weights,
+        params->config->max_width, 0, neuron, input);
+    /* Run it through the activation function */
     params->outputs[neuron] = params->config->activation(params->ifactor *
         params->outputs[neuron]);
   }
@@ -317,12 +323,18 @@ static void _output_bp_worker(void *in, void *out) {
     /* I double dog dare you to differentiate the error */
     double derr = error * params->config->activation_prime(out);
     params->derr_w[neuron] = derr;
-    for (int input = 0; input < params->w_count; input++) {
+    int input;
+    for (input = 0; input < params->w_count; input++) {
       GET_WEIGHT(params->oldw_w, mw, 0, neuron, input) =
         GET_WEIGHT(params->weights, mw, 0, neuron, input);
       GET_WEIGHT(params->weights, mw, 0, neuron, input) +=
         params->config->alpha * derr * params->inputs[input];
     }
+    /* The bias */
+    GET_WEIGHT(params->oldw_w, mw, 0, neuron, input) =
+      GET_WEIGHT(params->weights, mw, 0, neuron, input);
+    GET_WEIGHT(params->weights, mw, 0, neuron, input) +=
+      params->config->alpha * derr;
   }
 }
 
@@ -347,11 +359,36 @@ static void _bp_worker(void *in, void *out) {
   for (int neuron = params->start; neuron < params->end; neuron++) {
     double out = params->outputs[neuron];
     params->derr_w[neuron] *= params->config->activation_prime(out);
-    for (int input = 0; input < params->w_count; input++) {
+    int input;
+    for (input = 0; input < params->w_count; input++) {
       GET_WEIGHT(params->oldw_w, mw, 0, neuron, input) =
         GET_WEIGHT(params->weights, mw, 0, neuron, input);
       GET_WEIGHT(params->weights, mw, 0, neuron, input) +=
         params->config->alpha * params->derr_w[neuron] * params->inputs[input];
+    }
+    /* Adjust the bias */
+    GET_WEIGHT(params->oldw_w, mw, 0, neuron, input) =
+      GET_WEIGHT(params->weights, mw, 0, neuron, input);
+    GET_WEIGHT(params->weights, mw, 0, neuron, input) +=
+      params->config->alpha * params->derr_w[neuron];
+  }
+}
+
+void neuralnet_dump(neuralnet *net, FILE *stream) {
+  fprintf(stream, "Dumping neural net\n");
+  int mw = net->config.max_width;
+  for (int layer = 0; layer < net->config.layers; layer++) {
+    fprintf(stream, "\tDumping layer %d\n", layer);
+    for (int neuron = 0; neuron < net->config.layer_sizes[layer]; neuron++) {
+      fprintf(stream, "\t\tDumping neuron %d\n", neuron);
+      fprintf(stream, "\t\t\tWeights\n\t\t\t");
+      int total = neuron ? net->config.layer_sizes[layer - 1] : net->config.dimensionality;
+      int input;
+      for (input = 0; input < total; input++) {
+        fprintf(stream, "%f - ", GET_WEIGHT(net->w, mw, layer, neuron, input));
+      }
+      fprintf(stream, "%f\n", GET_WEIGHT(net->w, mw, layer, neuron, input));
+      fprintf(stream, "\t\t\tOutput: %f\n", net->out[(mw * layer) + neuron]);
     }
   }
 }

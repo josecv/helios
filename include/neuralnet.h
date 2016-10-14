@@ -16,6 +16,7 @@
  */
 #ifndef __HELIOS_NEURALNET__
 #define __HELIOS_NEURALNET__
+#include <stdio.h>
 
 /**
  * An activation function.
@@ -81,5 +82,12 @@ int neuralnet_train(neuralnet *net, const double *inputs, const double *labels,
  */
 int neuralnet_classify(neuralnet *net, const double *inputs, double *results,
                        int input_count);
+
+/**
+ * Dump out a debug log of the neural net given.
+ * @param net the net
+ * @param stream where to dump it to
+ */
+void neuralnet_dump(neuralnet *net, FILE *stream);
 
 #endif /* __HELIOS_NEURALNET__ */

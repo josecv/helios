@@ -19,7 +19,7 @@
 #include "neuralnet.h"
 #include "activations.h"
 
-#define ITERATIONS 1000
+#define ITERATIONS 200000
 
 START_TEST(test_neuralnet_or) {
   netconfig conf;
@@ -45,10 +45,10 @@ START_TEST(test_neuralnet_or) {
   }
   /* Just reuse the labels, can't be bothered */
   ck_assert_int_eq(neuralnet_classify(net, inputs, labels, 4), 1);
-  ck_assert(labels[0] < 0.05);
-  ck_assert(labels[1] > 0.95);
-  ck_assert(labels[2] > 0.95);
-  ck_assert(labels[3] > 0.95);
+  ck_assert_msg(labels[0] < 0.05, "Got %f\n", labels[0]);
+  ck_assert_msg(labels[1] > 0.95, "Got %f\n", labels[1]);
+  ck_assert_msg(labels[2] > 0.95, "Got %f\n", labels[2]);
+  ck_assert_msg(labels[3] > 0.95, "Got %f\n", labels[3]);
   neuralnet_destroy(net);
 }
 END_TEST
@@ -65,6 +65,7 @@ Suite *neuralnet_suite(void) {
   TCase *tc_simple = tcase_create("simple");
   tcase_add_test(tc_simple, test_neuralnet_xor);
   tcase_add_test(tc_simple, test_neuralnet_or);
+  tcase_set_timeout(tc_simple, 25);
 
   suite_add_tcase(s, tc_simple);
 
