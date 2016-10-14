@@ -119,7 +119,7 @@ int neuralnet_create(neuralnet **retval, netconfig config) {
     return 0;
   }
   for (int i = 0; i < sz; i++) {
-    net->w[i] = 0.5;
+    net->w[i] = ((double) rand() / (double) RAND_MAX);
   }
   /* That 2 is to save a bit of memory; after all we only ever need
    * two sets of old error derivatives: the ones for the next layer, to adjust
@@ -234,7 +234,7 @@ static int _init_layer_params(neuralnet *net) {
       /* layer % 2 will ensure that we alternate between read and write old
        * weigths every layer */
       p->oldw_r = &(GET_WEIGHT(net->oldw, mw, layer % 2, 0, 0));
-      p->oldw_w = &(GET_WEIGHT(net->oldw, mw, 1 - (layer % 2), 0, 0));
+      p->oldw_w = &(GET_WEIGHT(net->oldw, mw, ((layer + 1) % 2), 0, 0));
       if (!layer ) {
         p->w_count = net->config.dimensionality;
       } else {
@@ -248,9 +248,9 @@ static int _init_layer_params(neuralnet *net) {
       p->wnext_count = net->config.layer_sizes[layer];
       p->outputs = &(net->out[layer * mw]);
       p->derr_r = &(net->derr[(layer % 2) * mw]);
-      p->derr_w = &(net->derr[(1 - (layer % 2)) * mw]);
+      p->derr_w = &(net->derr[(((layer + 1) % 2)) * mw]);
       /* TODO: Check the literature on this factor. I'm not sure what's best */
-      p->ifactor = net->config.iscale * (net->config.layer_sizes[layer] / mw);
+      p->ifactor = net->config.iscale * (net->config.layer_sizes[layer] / ((double) mw));
       if (layer == net->config.layers - 1) {
         p->ifactor = net->config.iscale;
       }
@@ -382,10 +382,10 @@ void neuralnet_dump(neuralnet *net, FILE *stream) {
     for (int neuron = 0; neuron < net->config.layer_sizes[layer]; neuron++) {
       fprintf(stream, "\t\tDumping neuron %d\n", neuron);
       fprintf(stream, "\t\t\tWeights\n\t\t\t");
-      int total = neuron ? net->config.layer_sizes[layer - 1] : net->config.dimensionality;
+      int total = layer ? net->config.layer_sizes[layer - 1] : net->config.dimensionality;
       int input;
       for (input = 0; input < total; input++) {
-        fprintf(stream, "%f - ", GET_WEIGHT(net->w, mw, layer, neuron, input));
+        fprintf(stream, "%f * ", GET_WEIGHT(net->w, mw, layer, neuron, input));
       }
       fprintf(stream, "%f\n", GET_WEIGHT(net->w, mw, layer, neuron, input));
       fprintf(stream, "\t\t\tOutput: %f\n", net->out[(mw * layer) + neuron]);

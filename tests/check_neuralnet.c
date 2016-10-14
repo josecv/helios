@@ -54,7 +54,33 @@ START_TEST(test_neuralnet_or) {
 END_TEST
 
 START_TEST(test_neuralnet_xor) {
-  ck_assert_int_eq(2, 2);
+  netconfig conf;
+  int layer_sizes[2] = { 3, 1 };
+  conf.layers = 2;
+  conf.layer_sizes = layer_sizes;
+  conf.dimensionality = 2;
+  conf.activation = sigmoid;
+  conf.activation_prime = sigmoid_prime;
+  conf.threads = 2;
+  conf.alpha = 0.1;
+  conf.iscale = 0.1;
+  conf.max_width = 3;
+  neuralnet *net;
+  neuralnet_create(&net, conf);
+  double inputs[8] = { 0, 0,
+                       0, 1,
+                       1, 0,
+                       1, 1 };
+  double labels[4] = { 0, 1, 1, 0 };
+  for (int i = 0; i < ITERATIONS; i++) {
+    ck_assert_int_eq(neuralnet_train(net, inputs, labels, 4), 1);
+  }
+  ck_assert_int_eq(neuralnet_classify(net, inputs, labels, 4), 1);
+  ck_assert_msg(labels[0] < 0.05, "Got %f\n", labels[0]);
+  ck_assert_msg(labels[1] > 0.95, "Got %f\n", labels[1]);
+  ck_assert_msg(labels[2] > 0.95, "Got %f\n", labels[2]);
+  ck_assert_msg(labels[3] < 0.05, "Got %f\n", labels[3]);
+  neuralnet_destroy(net);
 }
 END_TEST
 
@@ -65,7 +91,7 @@ Suite *neuralnet_suite(void) {
   TCase *tc_simple = tcase_create("simple");
   tcase_add_test(tc_simple, test_neuralnet_xor);
   tcase_add_test(tc_simple, test_neuralnet_or);
-  tcase_set_timeout(tc_simple, 25);
+  tcase_set_timeout(tc_simple, 30);
 
   suite_add_tcase(s, tc_simple);
 
