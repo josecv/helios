@@ -29,7 +29,8 @@
  * @param weight the weight we want for the neuron
  */
 #define GET_WEIGHT(warray, max_width, layer, neuron, weight) \
-  warray[max_width * max_width * layer + max_width * neuron + weight]
+  warray[(max_width) * (max_width) * (layer) + (max_width) * (neuron) + \
+         (weight)]
 
 /**
  * Initialize the parameters for each layer for each worker.
